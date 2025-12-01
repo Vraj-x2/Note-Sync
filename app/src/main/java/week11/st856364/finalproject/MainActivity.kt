@@ -5,19 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
 import week11.st856364.finalproject.navigation.AppNavGraph
 import week11.st856364.finalproject.ui.auth.AuthViewModel
 import week11.st856364.finalproject.ui.notes.NotesViewModel
 import week11.st856364.finalproject.ui.theme.NoteSyncTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.getValue
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.compose.rememberNavController
-
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,4 +34,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
- 
