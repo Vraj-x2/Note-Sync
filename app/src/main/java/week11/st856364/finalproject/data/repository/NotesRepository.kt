@@ -10,18 +10,24 @@ class NotesRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
-    private fun notesCollectionPath(): String {
-        val uid = auth.currentUser?.uid
+    private fun currentUserUid(): String {
+        return auth.currentUser?.uid
             ?: throw IllegalStateException("User must be logged in")
-        // users/{uid}/notes
-        return "users/$uid/notes"
     }
+
+    private fun notesCollection(uid: String) =
+        db.collection("users")
+            .document(uid)
+            .collection("notes")
 
     fun listenToNotes(
         onNotesChanged: (List<Note>) -> Unit,
         onError: (Throwable) -> Unit
     ): ListenerRegistration {
-        return db.collection(notesCollectionPath())
+
+        val uid = currentUserUid()
+
+        return notesCollection(uid)
             .orderBy("timestamp")
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
@@ -34,18 +40,22 @@ class NotesRepository(
     }
 
     fun addNote(note: Note, onResult: (Result<Unit>) -> Unit) {
-        db.collection(notesCollectionPath())
+        val uid = currentUserUid()
+        notesCollection(uid)
             .add(note)
             .addOnSuccessListener { onResult(Result.success(Unit)) }
             .addOnFailureListener { e -> onResult(Result.failure(e)) }
     }
 
     fun updateNote(note: Note, onResult: (Result<Unit>) -> Unit) {
+        val uid = currentUserUid()
+
         if (note.id.isBlank()) {
-            onResult(Result.failure(IllegalArgumentException("Note id is empty")))
+            onResult(Result.failure(IllegalArgumentException("Note ID is empty")))
             return
         }
-        db.collection(notesCollectionPath())
+
+        notesCollection(uid)
             .document(note.id)
             .set(note)
             .addOnSuccessListener { onResult(Result.success(Unit)) }
@@ -53,11 +63,14 @@ class NotesRepository(
     }
 
     fun deleteNote(id: String, onResult: (Result<Unit>) -> Unit) {
+        val uid = currentUserUid()
+
         if (id.isBlank()) {
-            onResult(Result.failure(IllegalArgumentException("Note id is empty")))
+            onResult(Result.failure(IllegalArgumentException("Note ID is empty")))
             return
         }
-        db.collection(notesCollectionPath())
+
+        notesCollection(uid)
             .document(id)
             .delete()
             .addOnSuccessListener { onResult(Result.success(Unit)) }
