@@ -19,6 +19,9 @@ fun RegisterScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var localError by remember { mutableStateOf<String?>(null) }
+
+    val isLoading = uiState is UiState.Loading
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -36,22 +39,29 @@ fun RegisterScreen(
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { if (!isLoading) email = it },
+                enabled = !isLoading,
                 label = { Text("Email") },
                 modifier = Modifier.fillMaxWidth()
             )
+
             Spacer(Modifier.height(10.dp))
+
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { if (!isLoading) password = it },
+                enabled = !isLoading,
                 label = { Text("Password") },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
+
             Spacer(Modifier.height(10.dp))
+
             OutlinedTextField(
                 value = confirmPassword,
-                onValueChange = { confirmPassword = it },
+                onValueChange = { if (!isLoading) confirmPassword = it },
+                enabled = !isLoading,
                 label = { Text("Confirm Password") },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
@@ -59,23 +69,48 @@ fun RegisterScreen(
 
             Spacer(Modifier.height(16.dp))
 
+            // ----------- Register Button -----------
             Button(
                 onClick = {
-                    if (password == confirmPassword) {
-                        authViewModel.register(email.trim(), password.trim())
-                    } else {
-                        // simple local check
+                    if (!isLoading) {
+                        if (password != confirmPassword) {
+                            localError = "Passwords do not match"
+                        } else {
+                            localError = null
+                            authViewModel.register(email.trim(), password.trim())
+                        }
                     }
                 },
+                enabled = !isLoading,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Register")
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Register")
+                }
             }
 
-            TextButton(onClick = onNavigateBackToLogin) {
+            TextButton(onClick = {
+                if (!isLoading) onNavigateBackToLogin()
+            }) {
                 Text("Back to Login")
             }
 
+            // ----------- Local password mismatch error -----------
+            localError?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 13.sp
+                )
+            }
+
+            // ----------- Firebase error -----------
             if (uiState is UiState.Error) {
                 Spacer(Modifier.height(8.dp))
                 Text(
