@@ -219,7 +219,7 @@ fun AddEditNoteDialog(
                                     speechController.startListening(
                                         language = selectedLanguage,
                                         onResult = { spoken ->
-                                            // Translate spoken → selected language (usually same)
+                                            // Translate spoken → selected language
                                             GoogleTranslateService.translate(
                                                 text = spoken,
                                                 targetLang = selectedLanguage
