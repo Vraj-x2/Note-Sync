@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import week11.st856364.finalproject.ui.auth.*
 import week11.st856364.finalproject.ui.notes.NotesScreen
 import week11.st856364.finalproject.ui.notes.NotesViewModel
+import week11.st856364.finalproject.ui.settings.*
 import week11.st856364.finalproject.utils.UiState
 
 object Routes {
@@ -16,6 +17,12 @@ object Routes {
     const val REGISTER = "register"
     const val FORGOT = "forgot"
     const val NOTES = "notes"
+    const val PROFILE = "profile"
+
+    const val UPDATE_EMAIL = "update_email"
+    const val CHANGE_PASSWORD = "change_password"
+    const val EXPORT_NOTES = "export_notes"
+    const val HELP = "help"
 }
 
 @Composable
@@ -34,6 +41,8 @@ fun AppNavGraph(
         navController = navController,
         startDestination = startDestination
     ) {
+
+        // LOGIN
         composable(Routes.LOGIN) {
             LoginScreen(
                 authViewModel = authViewModel,
@@ -42,6 +51,8 @@ fun AppNavGraph(
                 onNavigateToForgot = { navController.navigate(Routes.FORGOT) }
             )
         }
+
+        // REGISTER
         composable(Routes.REGISTER) {
             RegisterScreen(
                 authViewModel = authViewModel,
@@ -49,6 +60,8 @@ fun AppNavGraph(
                 onNavigateBackToLogin = { navController.popBackStack() }
             )
         }
+
+        // FORGOT
         composable(Routes.FORGOT) {
             ForgotPasswordScreen(
                 authViewModel = authViewModel,
@@ -56,18 +69,59 @@ fun AppNavGraph(
                 onBackToLogin = { navController.popBackStack() }
             )
         }
+
+        // NOTES
         composable(Routes.NOTES) {
+            if (authState is AuthState.Authenticated) {
+                notesViewModel.startListening()
+            }
+
             val notesUiState by notesViewModel.uiState.collectAsState()
+
             NotesScreen(
                 notesViewModel = notesViewModel,
                 uiState = notesUiState,
                 onLogout = {
+                    notesViewModel.stopListening()
                     authViewModel.logout()
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(Routes.NOTES) { inclusive = true }
                     }
+                },
+                onNavigate = { route ->
+                    navController.navigate(route)
                 }
             )
+        }
+
+
+
+        composable(Routes.CHANGE_PASSWORD) {
+            ChangePasswordScreen(
+                authViewModel = authViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.EXPORT_NOTES) {
+            ExportNotesScreen(
+                notesViewModel = notesViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+// PROFILE SCREEN
+        composable(Routes.PROFILE) {
+            ProfileScreen(
+                authViewModel = authViewModel,
+                notesViewModel = notesViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+
+
+        composable(Routes.HELP) {
+            HelpAboutScreen(onBack = { navController.popBackStack() })
         }
     }
 }
