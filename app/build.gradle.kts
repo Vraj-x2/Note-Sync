@@ -76,6 +76,8 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.room.common.jvm)
+    implementation(libs.androidx.material3)
 
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
