@@ -1,0 +1,76 @@
+package week11.st856364.finalproject.network
+
+import android.os.Handler
+import android.os.Looper
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.io.IOException
+
+object GoogleTranslateService {
+
+    private const val API_KEY = "AIzaSyDa2bkxOuBcuAl5hRPPcA6OPzedAWl1ROY"
+    private val client = OkHttpClient()
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    fun translate(
+        text: String,
+        targetLang: String,
+        onResult: (String?) -> Unit
+    ) {
+        val url = "https://translation.googleapis.com/language/translate/v2?key=$API_KEY"
+
+        val bodyJson = JSONObject().apply {
+            put("q", text)
+            put("target", targetLang)
+            put("format", "text")
+        }
+
+        val requestBody = bodyJson.toString()
+            .toRequestBody("application/json".toMediaType())
+
+        val request = Request.Builder()
+            .url(url)
+            .post(requestBody)
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+
+            override fun onFailure(call: Call, e: IOException) {
+                println("TRANSLATE_FAILED: ${e.message}")
+                mainHandler.post { onResult(null) }
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val responseText = response.body?.string()
+                println("RAW_TRANSLATE_RESPONSE: $responseText")
+
+                try {
+                    val json = JSONObject(responseText ?: "")
+
+                    // If an error occurred
+                    if (json.has("error")) {
+                        val err = json.getJSONObject("error")
+                        println("GOOGLE_TRANSLATE_API_ERROR: code=${err.optInt("code")} msg=${err.optString("message")}")
+                        mainHandler.post { onResult(null) }
+                        return
+                    }
+
+                    // Successful v2 response
+                    val translated = json
+                        .getJSONObject("data")
+                        .getJSONArray("translations")
+                        .getJSONObject(0)
+                        .getString("translatedText")
+
+                    mainHandler.post { onResult(translated) }
+
+                } catch (e: Exception) {
+                    println("TRANSLATE_PARSE_ERROR: ${e.message}")
+                    mainHandler.post { onResult(null) }
+                }
+            }
+        })
+    }
+}
