@@ -28,16 +28,20 @@ class NotesViewModel(
     private val _userEmail = MutableStateFlow("")
     val userEmail: StateFlow<String> = _userEmail
 
+    val filteredNotes: StateFlow<List<Note>> =
+        combine(_notes, _searchText) { list, query ->
+            if (query.isBlank()) list
+            else list.filter {
+                it.title.contains(query, ignoreCase = true) ||
+                        it.content.contains(query, ignoreCase = true)
+            }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
+
     private var listenerRegistration: ListenerRegistration? = null
-
-    // Search filtering
-    val filteredNotes = combine(_notes, _searchText) { list, query ->
-        if (query.isBlank()) list
-        else list.filter {
-            it.title.contains(query, true) || it.content.contains(query, true)
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
 
     fun startListening() {
         stopListening()
@@ -47,7 +51,8 @@ class NotesViewModel(
         listenerRegistration = notesRepository.listenToNotes(
             onNotesChanged = { list ->
                 _notes.value = list.sortedWith(
-                    compareByDescending<Note> { it.pinned }.thenByDescending { it.timestamp }
+                    compareByDescending<Note> { it.pinned }
+                        .thenByDescending { it.timestamp }
                 )
             },
             onError = { e ->
@@ -56,18 +61,15 @@ class NotesViewModel(
         )
     }
 
-
     fun stopListening() {
         listenerRegistration?.remove()
         listenerRegistration = null
     }
 
-    /** Update search query */
     fun updateSearch(text: String) {
         _searchText.value = text
     }
 
-    /** Add or update note */
     fun addOrUpdateNote(
         id: String?,
         title: String,
@@ -83,18 +85,24 @@ class NotesViewModel(
 
         _uiState.value = UiState.Loading
 
+        val existingLanguage = if (!id.isNullOrBlank()) {
+            _notes.value.firstOrNull { it.id == id }?.languageCode ?: languageCode
+        } else {
+            languageCode
+        }
+
         val note = Note(
             id = id ?: "",
             title = title.ifBlank { "Untitled" },
             content = content,
             color = color,
             pinned = pinned,
-            languageCode = languageCode,
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            languageCode = existingLanguage
         )
 
-        val callback: (Result<Unit>) -> Unit = {
-            it.onSuccess {
+        val callback: (Result<Unit>) -> Unit = { result ->
+            result.onSuccess {
                 _uiState.value = UiState.Success("Saved")
                 resetUiState()
             }.onFailure { e ->
@@ -102,13 +110,16 @@ class NotesViewModel(
             }
         }
 
-        if (id.isNullOrBlank()) notesRepository.addNote(note, callback)
-        else notesRepository.updateNote(note, callback)
+        if (id.isNullOrBlank()) {
+            notesRepository.addNote(note, callback)
+        } else {
+            notesRepository.updateNote(note, callback)
+        }
     }
 
-    /** Delete note */
     fun deleteNote(id: String) {
         _uiState.value = UiState.Loading
+
         notesRepository.deleteNote(id) { result ->
             result.onSuccess {
                 _uiState.value = UiState.Success("Deleted")
@@ -119,7 +130,6 @@ class NotesViewModel(
         }
     }
 
-    /** Toggle pin */
     fun togglePin(note: Note) {
         addOrUpdateNote(
             id = note.id,
@@ -130,7 +140,6 @@ class NotesViewModel(
             pinned = !note.pinned
         )
     }
-
 
     fun changeNoteLanguage(
         note: Note,
@@ -152,8 +161,8 @@ class NotesViewModel(
                 timestamp = System.currentTimeMillis()
             )
 
-            notesRepository.updateNote(updatedNote) {
-                onResult(it.isSuccess)
+            notesRepository.updateNote(updatedNote) { result ->
+                onResult(result.isSuccess)
             }
         }
     }
