@@ -22,6 +22,8 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
+    val isLoading = uiState is UiState.Loading
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -65,35 +67,54 @@ fun LoginScreen(
 
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { if (!isLoading) email = it },
                         label = { Text("Email") },
+                        enabled = !isLoading,
                         modifier = Modifier.fillMaxWidth()
                     )
+
                     Spacer(Modifier.height(12.dp))
+
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = { if (!isLoading) password = it },
                         label = { Text("Password") },
                         visualTransformation = PasswordVisualTransformation(),
+                        enabled = !isLoading,
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(Modifier.height(16.dp))
 
                     Button(
-                        onClick = { authViewModel.login(email.trim(), password.trim()) },
+                        onClick = {
+                            if (!isLoading)
+                                authViewModel.login(email.trim(), password.trim())
+                        },
+                        enabled = !isLoading,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Login")
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Login")
+                        }
                     }
 
-                    TextButton(onClick = onNavigateToForgot) {
+                    TextButton(
+                        onClick = { if (!isLoading) onNavigateToForgot() }
+                    ) {
                         Text("Forgot Password?")
                     }
 
                     Spacer(Modifier.height(8.dp))
 
-                    TextButton(onClick = onNavigateToRegister) {
+                    TextButton(
+                        onClick = { if (!isLoading) onNavigateToRegister() }
+                    ) {
                         Text("Don't have an account? Register")
                     }
                 }
