@@ -2,24 +2,29 @@ package week11.st856364.finalproject.ui.notes
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import week11.st856364.finalproject.data.model.Note
 import week11.st856364.finalproject.ui.speech.SpeechRecognizerController
 import week11.st856364.finalproject.utils.UiState
@@ -31,170 +36,242 @@ fun NotesScreen(
     uiState: UiState,
     onLogout: () -> Unit
 ) {
-    val notes by notesViewModel.notes.collectAsState()
-    val ctx = LocalContext.current
-    val speechController = remember { SpeechRecognizerController(ctx) }
+    val notes by notesViewModel.filteredNotes.collectAsState()
+    val searchText by notesViewModel.searchText.collectAsState()
+    val userEmail by notesViewModel.userEmail.collectAsState()
+
+    val context = LocalContext.current
+    val speechController = remember { SpeechRecognizerController(context) }
 
     var isDialogOpen by remember { mutableStateOf(false) }
     var editingNote by remember { mutableStateOf<Note?>(null) }
 
-    LaunchedEffect(Unit) {
-        notesViewModel.startListening()
-    }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(text = "Hi,", fontSize = 14.sp)
-                        Text(
-                            text = "Good Morning",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { /* menu later */ }) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.ExitToApp, contentDescription = "Logout")
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    editingNote = null
-                    isDialogOpen = true
-                }
-            ) {
-                Text("+")
-            }
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            OutlinedTextField(
-                value = "",
-                onValueChange = {},
-                leadingIcon = { Icon(Icons.Default.Search, "Search") },
-                enabled = false, // search not implemented yet, keep UI simple
-                placeholder = { Text("Search note") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-            )
+    // ===============================
+    // Navigation Drawer
+    // ===============================
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
 
-            Spacer(Modifier.height(16.dp))
+                Text("Menu", modifier = Modifier.padding(16.dp))
 
-            Text(
-                text = "All Notes",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
+                NavigationDrawerItem(
+                    label = { Text("Profile") },
+                    selected = false,
+                    onClick = {},
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
 
-            Spacer(Modifier.height(8.dp))
-
-            if (notes.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("No notes yet. Tap + to add one.")
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(notes) { note ->
-                        NoteItem(
-                            note = note,
-                            onClick = {
-                                editingNote = note
-                                isDialogOpen = true
-                            },
-                            onDelete = { notesViewModel.deleteNote(note.id) }
-                        )
-                    }
-                }
-            }
-
-            if (uiState is UiState.Error) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = uiState.message,
-                    color = MaterialTheme.colorScheme.error,
-                    fontSize = 14.sp
+                NavigationDrawerItem(
+                    label = { Text("Logout") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onLogout()
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
             }
         }
-
-        AddEditNoteDialog(
-            isOpen = isDialogOpen,
-            initialTitle = editingNote?.title.orEmpty(),
-            initialContent = editingNote?.content.orEmpty(),
-            speechController = speechController,
-            onDismiss = { isDialogOpen = false },
-            onConfirm = { title, content ->
-                notesViewModel.addOrUpdateNote(
-                    id = editingNote?.id,
-                    title = title,
-                    content = content
-                )
-            }
-        )
-    }
-}
-
-@Composable
-private fun NoteItem(
-    note: Note,
-    onClick: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .clickable(onClick = onClick),
-        tonalElevation = 1.dp
     ) {
-        Row(
-            modifier = Modifier
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("Hi, $userEmail", fontSize = 14.sp)
+                            Text("Welcome Back!", fontSize = 20.sp)
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, "Menu")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onLogout) {
+                            Icon(Icons.Default.ExitToApp, "Logout")
+                        }
+                    }
+                )
+            },
+
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = {
+                        editingNote = null
+                        isDialogOpen = true
+                    }
+                ) { Text("+") }
+            }
+        ) { paddingValues ->
+
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .padding(16.dp)
+                    .fillMaxSize()
             ) {
+
+                // ============================
+                // SearchBar
+                // ============================
+                var active by remember { mutableStateOf(false) }
+                var query by remember { mutableStateOf(searchText) }
+
+                SearchBar(
+                    query = query,
+                    onQueryChange = { newText ->
+                        query = newText
+                        notesViewModel.updateSearch(newText)
+                    },
+                    onSearch = {
+                        notesViewModel.updateSearch(query)
+                        active = false
+                    },
+                    active = active,
+                    onActiveChange = { active = it },
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    placeholder = { Text("Search notes…") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {}
+
+                Spacer(Modifier.height(16.dp))
+
                 Text(
-                    text = note.title,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    "All Notes",
+                    style = MaterialTheme.typography.titleMedium
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = note.content,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    fontSize = 13.sp
-                )
+
+                Spacer(Modifier.height(12.dp))
+
+                // ============================
+                // NOTES LIST
+                // ============================
+                if (notes.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No notes yet. Tap + to add.")
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+
+                        items(notes, key = { it.id }) { note ->
+
+                            val dismissState = rememberSwipeToDismissBoxState(
+                                confirmValueChange = { value ->
+                                    if (value == SwipeToDismissBoxValue.EndToStart) {
+
+                                        val deletedNote = note
+                                        notesViewModel.deleteNote(note.id)
+
+                                        scope.launch {
+                                            val res = snackbarHostState.showSnackbar(
+                                                "Note deleted",
+                                                actionLabel = "Undo",
+                                                duration = SnackbarDuration.Short
+                                            )
+
+                                            if (res == SnackbarResult.ActionPerformed) {
+                                                notesViewModel.addOrUpdateNote(
+                                                    id = deletedNote.id,
+                                                    title = deletedNote.title,
+                                                    content = deletedNote.content,
+                                                    color = deletedNote.color,
+                                                    languageCode = deletedNote.languageCode,
+                                                    pinned = deletedNote.pinned
+                                                )
+                                            }
+                                        }
+                                    }
+                                    true
+                                }
+                            )
+
+                            SwipeToDismissBox(
+                                state = dismissState,
+                                enableDismissFromEndToStart = true,
+                                backgroundContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color(0xFFE57373))
+                                            .clip(MaterialTheme.shapes.medium),
+                                        contentAlignment = Alignment.CenterEnd
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Delete, null,
+                                            tint = Color.White,
+                                            modifier = Modifier.padding(end = 24.dp)
+                                        )
+                                    }
+                                },
+                                content = {
+                                    NoteItem(
+                                        note = note,
+                                        onClick = {
+                                            editingNote = note
+                                            isDialogOpen = true
+                                        },
+                                        onDelete = { notesViewModel.deleteNote(note.id) },
+                                        onTogglePin = { notesViewModel.togglePin(note) },
+                                        onChangeLanguage = { targetLang ->
+                                            notesViewModel.changeNoteLanguage(
+                                                note,
+                                                targetLanguageCode = targetLang
+                                            ) { success ->
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        if (success) "Translated!" else "Translation failed"
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete")
-            }
+
+            // ============================
+            // ADD / EDIT DIALOG
+            // ============================
+            AddEditNoteDialog(
+                isOpen = isDialogOpen,
+                initialTitle = editingNote?.title.orEmpty(),
+                initialContent = editingNote?.content.orEmpty(),
+                initialColor = editingNote?.color,
+                initialLanguage = editingNote?.languageCode ?: "en",
+                speechController = speechController,
+
+                onDismiss = { isDialogOpen = false },
+
+                onConfirm = { ttl, cont, col, lang ->
+                    notesViewModel.addOrUpdateNote(
+                        id = editingNote?.id,
+                        title = ttl,
+                        content = cont,
+                        color = col,
+                        languageCode = lang,
+                        pinned = editingNote?.pinned ?: false
+                    )
+                }
+            )
         }
     }
 }
