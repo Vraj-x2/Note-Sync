@@ -53,7 +53,7 @@ class SpeechRecognizerController(
         onResult: (String) -> Unit,
         onError: (String) -> Unit
     ) {
-        if (isListening) return  // To prevent double start
+        if (isListening) return  // prevent double-start
 
         onResultCallback = onResult
         onErrorCallback = onError
