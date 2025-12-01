@@ -21,10 +21,9 @@ class AuthViewModel(
 ) : ViewModel() {
 
     private val _authState =
-        MutableStateFlow<AuthState>(if (authRepository.currentUser != null)
-            AuthState.Authenticated(authRepository.currentUser!!)
-        else
-            AuthState.Unauthenticated
+        MutableStateFlow<AuthState>(
+            authRepository.currentUser?.let { AuthState.Authenticated(it) }
+                ?: AuthState.Unauthenticated
         )
     val authState: StateFlow<AuthState> = _authState
 
@@ -36,40 +35,42 @@ class AuthViewModel(
             _uiState.value = UiState.Error("Email and password are required")
             return
         }
+
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             _uiState.value = UiState.Loading
+
             val result = authRepository.signIn(email, password)
-            result
-                .onSuccess { user ->
-                    _authState.value = AuthState.Authenticated(user)
-                    _uiState.value = UiState.Success("Login successful")
-                }
-                .onFailure { e ->
-                    _authState.value = AuthState.Error(e.message ?: "Login failed")
-                    _uiState.value = UiState.Error(e.message ?: "Login failed")
-                }
+
+            result.onSuccess { user ->
+                _authState.value = AuthState.Authenticated(user)
+                _uiState.value = UiState.Success("Login successful")
+            }.onFailure { e ->
+                _authState.value = AuthState.Error(e.message ?: "Login failed")
+                _uiState.value = UiState.Error(e.message ?: "Login failed")
+            }
         }
     }
 
     fun register(email: String, password: String) {
         if (email.isBlank() || password.length < 6) {
-            _uiState.value = UiState.Error("Valid email and 6+ char password required")
+            _uiState.value = UiState.Error("Valid email & 6+ char password required")
             return
         }
+
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             _uiState.value = UiState.Loading
+
             val result = authRepository.signUp(email, password)
-            result
-                .onSuccess { user ->
-                    _authState.value = AuthState.Authenticated(user)
-                    _uiState.value = UiState.Success("Registration successful")
-                }
-                .onFailure { e ->
-                    _authState.value = AuthState.Error(e.message ?: "Registration failed")
-                    _uiState.value = UiState.Error(e.message ?: "Registration failed")
-                }
+
+            result.onSuccess { user ->
+                _authState.value = AuthState.Authenticated(user)
+                _uiState.value = UiState.Success("Registration successful")
+            }.onFailure { e ->
+                _authState.value = AuthState.Error(e.message ?: "Registration failed")
+                _uiState.value = UiState.Error(e.message ?: "Registration failed")
+            }
         }
     }
 
@@ -78,7 +79,9 @@ class AuthViewModel(
             _uiState.value = UiState.Error("Email is required")
             return
         }
+
         _uiState.value = UiState.Loading
+
         authRepository.sendPasswordReset(email) { result ->
             result
                 .onSuccess {
@@ -95,5 +98,26 @@ class AuthViewModel(
     fun logout() {
         authRepository.signOut()
         _authState.value = AuthState.Unauthenticated
+        _uiState.value = UiState.Idle
+    }
+
+
+
+
+    fun changePassword(newPassword: String) {
+        if (newPassword.length < 6) {
+            _uiState.value = UiState.Error("Password must be at least 6 characters")
+            return
+        }
+
+        _uiState.value = UiState.Loading
+
+        authRepository.updatePassword(newPassword) { result ->
+            result.onSuccess {
+                _uiState.value = UiState.Success("Password updated successfully")
+            }.onFailure { e ->
+                _uiState.value = UiState.Error(e.message ?: "Failed to update password")
+            }
+        }
     }
 }
