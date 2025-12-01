@@ -69,7 +69,7 @@ class NotesRepository(
             onResult(Result.failure(IllegalArgumentException("Note ID is empty")))
             return
         }
-
+//
         notesCollection(uid)
             .document(id)
             .delete()
