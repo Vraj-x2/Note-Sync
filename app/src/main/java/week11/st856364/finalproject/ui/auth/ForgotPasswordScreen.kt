@@ -42,14 +42,26 @@ fun ForgotPasswordScreen(
 
             Button(
                 onClick = {
-                    authViewModel.sendResetPassword(email.trim())
+                    if (uiState !is UiState.Loading) {
+                        authViewModel.sendResetPassword(email.trim())
+                    }
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = uiState !is UiState.Loading
             ) {
-                Text("Send reset email")
+                if (uiState is UiState.Loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Send reset email")
+                }
             }
 
-            TextButton(onClick = onBackToLogin) {
+            TextButton(onClick = {
+                onBackToLogin()
+            }) {
                 Text("Back to Login")
             }
 
