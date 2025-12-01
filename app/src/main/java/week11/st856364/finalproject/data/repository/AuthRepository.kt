@@ -12,6 +12,9 @@ class AuthRepository(
     val currentUser: FirebaseUser?
         get() = auth.currentUser
 
+    // -----------------------------
+    // SIGN IN
+    // -----------------------------
     suspend fun signIn(email: String, password: String): Result<FirebaseUser> =
         suspendCancellableCoroutine { cont ->
             auth.signInWithEmailAndPassword(email, password)
@@ -20,7 +23,7 @@ class AuthRepository(
                     if (user != null) {
                         cont.resume(Result.success(user))
                     } else {
-                        cont.resume(Result.failure(IllegalStateException("User is null")))
+                        cont.resume(Result.failure(Exception("User is null after sign-in")))
                     }
                 }
                 .addOnFailureListener { e ->
@@ -28,6 +31,9 @@ class AuthRepository(
                 }
         }
 
+    // -----------------------------
+    // SIGN UP
+    // -----------------------------
     suspend fun signUp(email: String, password: String): Result<FirebaseUser> =
         suspendCancellableCoroutine { cont ->
             auth.createUserWithEmailAndPassword(email, password)
@@ -36,7 +42,7 @@ class AuthRepository(
                     if (user != null) {
                         cont.resume(Result.success(user))
                     } else {
-                        cont.resume(Result.failure(IllegalStateException("User is null")))
+                        cont.resume(Result.failure(Exception("User is null after sign-up")))
                     }
                 }
                 .addOnFailureListener { e ->
@@ -44,12 +50,35 @@ class AuthRepository(
                 }
         }
 
+    // -----------------------------
+    // PASSWORD RESET
+    // -----------------------------
     fun sendPasswordReset(email: String, onResult: (Result<Unit>) -> Unit) {
         auth.sendPasswordResetEmail(email)
             .addOnSuccessListener { onResult(Result.success(Unit)) }
             .addOnFailureListener { e -> onResult(Result.failure(e)) }
     }
 
+    // -----------------------------
+    // Re-Authenticate (helps for delete/update)
+    // -----------------------------
+    fun reAuthenticate(email: String, password: String, onResult: (Result<Unit>) -> Unit) {
+        val user = auth.currentUser
+        if (user == null) {
+            onResult(Result.failure(Exception("No logged-in user")))
+            return
+        }
+
+        val credential = com.google.firebase.auth.EmailAuthProvider.getCredential(email, password)
+
+        user.reauthenticate(credential)
+            .addOnSuccessListener { onResult(Result.success(Unit)) }
+            .addOnFailureListener { e -> onResult(Result.failure(e)) }
+    }
+
+    // -----------------------------
+    // SIGN OUT
+    // -----------------------------
     fun signOut() {
         auth.signOut()
     }
